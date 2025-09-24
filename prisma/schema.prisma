@@ -1,0 +1,137 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  full_name String?
+  avatar_url String?
+  bio       String?
+  location  String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  
+  // Gamification
+  points    Int @default(0)
+  level     Int @default(1)
+  
+  // Skills
+  skills_to_teach UserSkill[] @relation("TeachingSkills")
+  skills_to_learn UserSkill[] @relation("LearningSkills")
+  
+  // Sessions
+  teaching_sessions Session[] @relation("TeacherSessions")
+  learning_sessions Session[] @relation("LearnerSessions")
+  
+  // Messages
+  sent_messages     Message[] @relation("SentMessages")
+  received_messages Message[] @relation("ReceivedMessages")
+  
+  // Badges
+  user_badges UserBadge[]
+  
+  // Presence
+  is_online Boolean @default(false)
+  last_seen DateTime @default(now())
+
+  @@map("users")
+}
+
+model Skill {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  category    String
+  difficulty  String   // beginner, intermediate, advanced
+  tags        String[]
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+  
+  user_skills UserSkill[]
+
+  @@map("skills")
+}
+
+model UserSkill {
+  id       String @id @default(uuid())
+  user_id  String
+  skill_id String
+  type     String // "teach" or "learn"
+  level    String // "beginner", "intermediate", "advanced"
+  
+  user  User  @relation(fields: [user_id], references: [id], onDelete: Cascade, name: type == "teach" ? "TeachingSkills" : "LearningSkills")
+  skill Skill @relation(fields: [skill_id], references: [id], onDelete: Cascade)
+  
+  created_at DateTime @default(now())
+  
+  @@unique([user_id, skill_id, type])
+  @@map("user_skills")
+}
+
+model Session {
+  id          String   @id @default(uuid())
+  teacher_id  String
+  learner_id  String
+  skill_id    String?
+  title       String
+  description String?
+  start_time  DateTime
+  end_time    DateTime
+  status      String   @default("scheduled") // scheduled, completed, cancelled
+  
+  teacher User  @relation("TeacherSessions", fields: [teacher_id], references: [id], onDelete: Cascade)
+  learner User  @relation("LearnerSessions", fields: [learner_id], references: [id], onDelete: Cascade)
+  
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("sessions")
+}
+
+model Message {
+  id          String   @id @default(uuid())
+  sender_id   String
+  receiver_id String
+  content     String
+  read        Boolean  @default(false)
+  created_at  DateTime @default(now())
+  
+  sender   User @relation("SentMessages", fields: [sender_id], references: [id], onDelete: Cascade)
+  receiver User @relation("ReceivedMessages", fields: [receiver_id], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+model Badge {
+  id          String @id @default(uuid())
+  name        String @unique
+  description String
+  icon        String
+  color       String
+  
+  user_badges UserBadge[]
+
+  @@map("badges")
+}
+
+model UserBadge {
+  id         String   @id @default(uuid())
+  user_id    String
+  badge_id   String
+  earned_at  DateTime @default(now())
+  
+  user  User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  badge Badge @relation(fields: [badge_id], references: [id], onDelete: Cascade)
+  
+  @@unique([user_id, badge_id])
+  @@map("user_badges")
+}
